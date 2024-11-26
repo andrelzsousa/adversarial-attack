@@ -2,11 +2,11 @@
 
 import os
 from PIL import Image
-from disturb_image import disturb_image
-from save_image import save_image
-from test_classifier import test_classifier
 import requests
 import numpy as np
+
+DISTURBED_IMAGES_DIR = 'disturbed_images'
+APPROVED_IMAGES_DIR = 'approved_images'
 
 def disturb_image(image, epsilon, noise_type):
   image_array = np.array(image).astype(np.float32) / 255
@@ -34,15 +34,14 @@ def test_classifier(path):
         'User-Agent': 'python-requests'
       }
 
-      request = requests.post(
+      res = requests.post(
         'http://ec2-54-85-67-162.compute-1.amazonaws.com:8080/classify',
         headers=headers,
         files=files,
       )
       
-      
-      request.raise_for_status()
-      return request.text        
+      res.raise_for_status()
+      return res.text        
   except Exception as e:
       return "Error: " + str(e)
 
@@ -53,31 +52,27 @@ def save_image(image, directory, name):
   return final_path
 
 def main():
-  disturbed_images_dir = 'disturbed_images'
-  approved_images_dir = 'approved_images'
+  if not os.path.exists(DISTURBED_IMAGES_DIR):
+    os.makedirs(DISTURBED_IMAGES_DIR)
 
-  if not os.path.exists(disturbed_images_dir):
-    os.makedirs(disturbed_images_dir)
-
-  if not os.path.exists(approved_images_dir):
-    os.makedirs(approved_images_dir)
+  if not os.path.exists(APPROVED_IMAGES_DIR):
+    os.makedirs(APPROVED_IMAGES_DIR)
 
   original_image = Image.open("images/reprovado.jpg")
   types = ['gaussian', 'uniform']
 
   for noise_type in types:
     for i in range(5):    
-      epsilon = 0.1 * (i + 1)
-
+      epsilon = (i + 1) * 0.1
       image_name = f"{noise_type}-{i}.jpg"
 
       disturbed_image = disturb_image(original_image, epsilon=epsilon  , noise_type=noise_type)
-      final_path = save_image(disturbed_image, disturbed_images_dir, image_name)
+      final_path = save_image(disturbed_image, DISTURBED_IMAGES_DIR, image_name)
       result = test_classifier(final_path).lower()
 
       if "aprovado" in result:
         print(f"Aprroved Image ({image_name}): {noise_type} with epsilon={epsilon:.2f}")
-        save_image(disturbed_image, approved_images_dir, image_name)
+        save_image(disturbed_image, APPROVED_IMAGES_DIR, image_name)
         break
 
 if __name__ == '__main__':
